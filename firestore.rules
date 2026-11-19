@@ -1,0 +1,28 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function role() { return request.auth.token.role; }
+    function isAdmin() { return signedIn() && role() == 'admin'; }
+    function isTeacher() { return signedIn() && role() == 'teacher'; }
+    function mineRec() { return signedIn() && (resource.data.studentId == request.auth.uid || request.auth.uid in resource.data.parentIds); }
+
+    match /{document=**} { allow read, write: if isAdmin(); }
+
+    match /students/{id} {
+      allow read: if isTeacher() || (signedIn() && request.auth.uid == id)
+        || (signedIn() && role() == 'parent' && request.auth.uid in resource.data.parentIds);
+    }
+    match /teachers/{id} { allow read: if signedIn() && request.auth.uid == id; }
+    match /parents/{id}  { allow read: if signedIn() && request.auth.uid == id; }
+
+    match /attendance/{id} { allow read: if isTeacher() || mineRec(); allow write: if isTeacher(); }
+    match /remarks/{id}    { allow read: if isTeacher() || mineRec(); allow write: if isTeacher(); }
+    match /invoices/{id}   { allow read: if mineRec(); }
+
+    match /classes/{id}     { allow read: if signedIn(); }
+    match /assignments/{id} { allow read: if signedIn(); allow write: if isTeacher(); }
+    match /resources/{id}   { allow read: if signedIn(); allow write: if isTeacher(); }
+    match /announcements/{id} { allow read: if signedIn(); }
+  }
+}

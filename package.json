@@ -1,0 +1,9 @@
+{
+  "name": "nova-lms",
+  "private": true,
+  "description": "NOVA Virtual School LMS (plain HTML/CSS/JS + Firebase + Vercel API)",
+  "dependencies": {
+    "firebase-admin": "^14.5.1",
+    "resend": "^6.39.0"
+  }
+}
