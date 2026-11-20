@@ -4,23 +4,38 @@ const { getAuth } = require("firebase-admin/auth");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { randomBytes } = require("crypto");
 
-if (!getApps().length) {
-  initializeApp({ credential: cert({
-    projectId: process.env.FIREBASE_PROJECT_ID,
-    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-    privateKey: (process.env.FIREBASE_PRIVATE_KEY || "").replace(/\\n/g, "\n"),
-  }) });
+let auth, db;
+function init() {                       // runs inside try/catch so setup problems come back as a readable error
+  if (!getApps().length) {
+    initializeApp({ credential: cert({
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: (process.env.FIREBASE_PRIVATE_KEY || "").replace(/\\n/g, "\n").replace(/^"|"$/g, ""),
+    }) });
+  }
+  auth = getAuth(); db = getFirestore();
 }
-const auth = getAuth(), db = getFirestore();
 const COL = { teacher: "teachers", parent: "parents", student: "students" };
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
 module.exports = async (req, res) => {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
   try {
+    init();
     const me = await auth.verifyIdToken((req.headers.authorization || "").replace("Bearer ", ""));
     if (me.role !== "admin") return res.status(403).json({ error: "Admins only" });
     const b = req.body || {};
+    if (b.action === "link") {
+      const { parentId, studentId, unlink } = b; if (!parentId || !studentId) return res.status(400).json({ error: "Choose a parent and a child" });
+      const op = unlink ? FieldValue.arrayRemove : FieldValue.arrayUnion;
+      await db.collection("students").doc(studentId).update({ parentIds: op(parentId) });
+      await db.collection("parents").doc(parentId).update({ childIds: op(studentId) });
+      for (const c of ["attendance", "invoices", "remarks"]) {            // keep existing records visible to the parent
+        const q = await db.collection(c).where("studentId", "==", studentId).get();
+        for (let i = 0; i < q.docs.length; i += 400) { const batch = db.batch(); q.docs.slice(i, i + 400).forEach((d) => batch.update(d.ref, { parentIds: op(parentId) })); await batch.commit(); }
+      }
+      return res.json({ ok: true });
+    }
     if (!COL[b.role]) return res.status(400).json({ error: "Invalid role" });
 
     if (b.action === "status") {
