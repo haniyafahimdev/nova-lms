@@ -88,3 +88,5 @@ footer a{text-decoration:none}
 :root{--billed:#c3cff0}.dark.dark{--billed:#3b4580}
 .ring{place-content:center;gap:0;text-align:center}.ring small{font-size:.72rem;line-height:1.1}.ring b{line-height:1.1}
 .bfill.billed{background:var(--billed)}.key{display:inline-block;width:12px;height:12px;border-radius:3px;background:var(--brand);vertical-align:-1px}.key.billed{background:var(--billed)}
+/* fix: fee bars collapsed to zero width inside the pair container */
+.pair .bfill{width:22px;max-width:none;min-height:3px}
