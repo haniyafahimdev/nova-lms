@@ -83,3 +83,8 @@ footer a{text-decoration:none}
 .role-parent{--brand:#14a38b;--brand-ink:#fff;--tint:#e4f7f2;--side:#0f3d38;--acc:#ff7a59;--bg:#f4fbf9;--line:#d5eee8}
 .role-teacher .hello:after{content:"🍎"}.role-parent .hello:after{content:"🌸"}
 .dark.dark{--ink:#eef1ff;--bg:#0d1020;--card:#151a33;--line:#262c52;--tint:#0d1020;--side:#0a0d1c;--muted:#a0a8d4}
+
+/* fixes: attendance ring text, visible fee bars */
+:root{--billed:#c3cff0}.dark.dark{--billed:#3b4580}
+.ring{place-content:center;gap:0;text-align:center}.ring small{font-size:.72rem;line-height:1.1}.ring b{line-height:1.1}
+.bfill.billed{background:var(--billed)}.key{display:inline-block;width:12px;height:12px;border-radius:3px;background:var(--brand);vertical-align:-1px}.key.billed{background:var(--billed)}
