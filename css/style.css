@@ -90,3 +90,6 @@ footer a{text-decoration:none}
 .bfill.billed{background:var(--billed)}.key{display:inline-block;width:12px;height:12px;border-radius:3px;background:var(--brand);vertical-align:-1px}.key.billed{background:var(--billed)}
 /* fix: fee bars collapsed to zero width inside the pair container */
 .pair .bfill{width:22px;max-width:none;min-height:3px}
+
+/* dashboard charts: don't stretch cards, never overflow */
+.two{align-items:start}.two>.card{overflow:hidden;min-width:0}.bars{overflow-x:auto;overflow-y:hidden}.bcol{min-width:44px}
