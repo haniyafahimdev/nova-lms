@@ -16,6 +16,7 @@ const nm = (s) => `${s.firstName || ""} ${s.lastName || ""}`.trim();
 const classNames = async () => (await get("classes")).map((c) => c.name).sort();
 const activeStudents = () => get("students", F.where("status", "==", "active"));
 let me = {}, kids = [];
+const put = (box, ...k) => box.append(...k.filter((x) => x != null && x !== false));   // never prints null
 const ytId = (u) => { try { const x = new URL(u); const id = x.hostname === "youtu.be" ? x.pathname.slice(1) : /youtube\.com$/.test(x.hostname) ? (x.searchParams.get("v") || x.pathname.split("/").pop()) : ""; return /^[\w-]{11}$/.test(id) ? id : null; } catch { return null; } };
 const play = (url, title) => {                       // plays YouTube inside the page, no new tab
   const m = h("div", { class: "modal", onclick: (e) => { if (e.target === m) m.remove(); } }, h("div", { class: "mbox" },
@@ -79,20 +80,29 @@ const crud = (coll, fx, cols, pre = (d) => d) => async (box) => {
     h("button", { class: "btn sm ghost", onclick: async () => { if (confirm("Delete this?")) { await F.deleteDoc(F.doc(db, coll, r.id)); load(); } } }, "Delete")));
   box.append(form(await fx(), async (d) => { await F.addDoc(F.collection(db, coll), { ...pre(d), createdAt: F.serverTimestamp(), by: me.uid }); toast("Saved"); load(); }), list); load();
 };
-const people = (role, coll, fx, cols) => async (box) => {
+const people = (role, coll, fx, cols, ctxFn) => async (box) => {
   const list = h("div"), note = h("p", { class: "notice", hidden: true });
+  const withCtx = async (rows) => { const d = ctxFn ? await ctxFn() : () => ({}); return rows.map((r) => ({ ...r, name: nm(r), ...d(r) })); };
   const load = async () => list.replaceChildren(table([["name", "Name"], ["email", "Email"], ...cols, ["status", "Status", "status"]],
-    (await get(coll)).map((r) => ({ ...r, name: nm(r) })), (r) => h("button", { class: "btn sm ghost", onclick: async () => {
+    await withCtx(await get(coll)), (r) => h("button", { class: "btn sm ghost", onclick: async () => {
       try { await api({ action: "status", role, uid: r.id, disabled: r.status === "active" }); load(); } catch (e) { toast(e.message, 1); } } }, r.status === "active" ? "Deactivate" : "Activate")));
   const base = [{ n: "firstName", l: "First name", r: 1 }, { n: "lastName", l: "Last name", r: 1 }, { n: "email", l: "Login email", t: "email", r: 1 }];
   box.append(form([...base, ...await fx()], async (d) => { const { firstName, lastName, email, ...extra } = d;
     const x = await api({ role, firstName, lastName, email, extra });
-    note.textContent = x.emailSent ? `${firstName} added. Login details were emailed.` : `${firstName} added. Email not set up yet. Temporary password: ${x.tempPassword}`; note.hidden = false; load(); }), note, list); load();
+    note.textContent = x.emailSent ? `${firstName} added. Login details were emailed.` : `${firstName} added. Email not set up yet. Temporary password: ${x.tempPassword}`; note.hidden = false; load(); }), note, ...(ctxFn ? [await linkCard(load)] : []), list); load();
+};
+const linkCard = async (reload) => {                  // connect (or disconnect) a parent and a child
+  const [P, S] = await Promise.all([get("parents"), get("students")]);
+  return h("div", {}, h("b", {}, "Link a parent to a child"), form([
+    { n: "parentId", l: "Parent", t: "select", o: P.map((p) => ({ v: p.id, l: nm(p) + " (" + p.email + ")" })), r: 1 },
+    { n: "studentId", l: "Child", t: "select", o: S.map((x) => ({ v: x.id, l: nm(x) + " · " + (x.className || "no class") })), r: 1 },
+    { n: "act", l: "Action", t: "select", o: ["Link", "Unlink"] }],
+    async (d) => { await api({ action: "link", parentId: d.parentId, studentId: d.studentId, unlink: d.act === "Unlink" }); toast(d.act === "Link" ? "Linked" : "Unlinked"); reload(); }, "Update link"));
 };
 const M = {};
-M.students = people("student", "students", async () => [{ n: "admissionNo", l: "Admission no." }, { n: "className", l: "Class", t: "select", o: await classNames() }, { n: "dob", l: "Date of birth", t: "date" }, { n: "parentEmail", l: "Parent’s login email (optional)", t: "email" }], [["admissionNo", "Adm. no."], ["className", "Class"]]);
-M.teachers = people("teacher", "teachers", async () => [{ n: "phone", l: "Phone" }, { n: "subjects", l: "Subjects" }], [["phone", "Phone"], ["subjects", "Subjects"]]);
-M.parents = people("parent", "parents", async () => [{ n: "phone", l: "Phone" }, { n: "relationship", l: "Relationship" }], [["phone", "Phone"], ["relationship", "Relation"]]);
+M.students = people("student", "students", async () => [{ n: "admissionNo", l: "Admission no." }, { n: "className", l: "Class", t: "select", o: await classNames() }, { n: "dob", l: "Date of birth", t: "date" }, { n: "parentEmail", l: "Parent’s login email (optional)", t: "email" }], [["admissionNo", "Adm. no."], ["className", "Class"], ["parents", "Parent"]], async () => { const P = await get("parents"); return (r) => ({ parents: (r.parentIds || []).map((id) => nm(P.find((p) => p.id === id) || {})).filter(Boolean).join(", ") || "–" }); });
+M.teachers = people("teacher", "teachers", async () => [{ n: "title", l: "Title (for greeting)", t: "select", o: ["Miss", "Sir", "Mrs.", "Mr.", "Dr."] }, { n: "phone", l: "Phone" }, { n: "subjects", l: "Subjects" }], [["title", "Title"], ["phone", "Phone"], ["subjects", "Subjects"]]);
+M.parents = people("parent", "parents", async () => [{ n: "phone", l: "Phone" }, { n: "relationship", l: "Relationship" }], [["phone", "Phone"], ["relationship", "Relation"], ["children", "Children"]], async () => { const S = await get("students"); return (r) => ({ children: S.filter((x) => (x.parentIds || []).includes(r.id)).map(nm).join(", ") || "–" }); });
 M.classes = crud("classes", async () => [{ n: "name", l: "Class name (e.g. Grade 2)", r: 1 }], [["name", "Class"]]);
 M.subjects = crud("subjects", async () => [{ n: "name", l: "Subject (e.g. Maths)", r: 1 }, { n: "className", l: "Class", t: "select", o: await classNames(), r: 1 }, { n: "teacher", l: "Teacher", t: "select", o: ["", ...(await get("teachers")).map(nm)] }], [["name", "Subject"], ["className", "Class"], ["teacher", "Teacher"]]);
 M.assignments = crud("assignments", async () => [{ n: "title", l: "Title", r: 1 }, { n: "cs", l: "Class · Subject", t: "select", o: await csOpts(), r: 1 }, { n: "dueDate", l: "Due date", t: "date" }, { n: "pdfUrl", l: "Homework PDF link (Google Drive etc.)", t: "url" }, { n: "description", l: "Instructions", t: "area" }], [["title", "Title"], ["className", "Class"], ["subject", "Subject"], ["dueDate", "Due"], ["pdfUrl", "PDF", "link"]], splitCs);
@@ -107,7 +117,7 @@ M.myTT = async (box) => { const c = classesOfKids(); if (!c.length) return noCla
 M.tTT = async (box) => box.append(ttGrid(await get("timetable", F.where("teacher", "==", me.name)), "teacher"));
 M.home = async (box) => {
   const c = classesOfKids(), rows = c.length ? (await get("timetable", F.where("className", "in", c))).filter((r) => r.day === todayAbbr()).sort((a, b) => a.period - b.period) : [];
-  box.append(h("div", { class: "card hello" }, h("h2", {}, `Hi ${me.name.split(" ")[0]}! 👋`), h("p", {}, rows.length ? "Here are your classes today:" : "No classes today. Enjoy your day! 🎉")), rows.length ? h("div", { class: "tt one" }, ...rows.map((r) => slot(r, "student"))) : null);
+  put(box, h("div", { class: "card hello" }, h("h2", {}, `Hi ${me.name.split(" ")[0]}! 👋`), h("p", {}, rows.length ? "Here are your classes today:" : "No classes today. Enjoy your day! 🎉")), rows.length ? h("div", { class: "tt one" }, ...rows.map((r) => slot(r, "student"))) : null);
 };
 M.dash = async (box) => {
   const t = today(), day = (n) => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10), cnt = (c) => F.getCountFromServer(F.collection(db, c)).then((x) => x.data().count);
@@ -184,6 +194,20 @@ M.remarks = async (box) => {
 const mine = () => me.role === "parent" ? F.where("parentIds", "array-contains", me.uid) : F.where("studentId", "==", me.uid);
 const classesOfKids = () => [...new Set(kids.map((k) => k.className).filter(Boolean))];
 const noClass = (box) => box.append(h("p", { class: "notice" }, "No class has been assigned yet. Please contact the school office."));
+M.tHome = async (box) => {
+  const rows = (await get("timetable", F.where("teacher", "==", me.name))).filter((r) => r.day === todayAbbr()).sort((a, b) => a.period - b.period);
+  put(box, h("div", { class: "card hello" }, h("h2", {}, `Hey ${[me.title, me.name.split(" ")[0]].filter(Boolean).join(" ")}! 👋`), h("p", {}, rows.length ? `You have ${rows.length} class${rows.length > 1 ? "es" : ""} today:` : "No classes scheduled today.")),
+    rows.length ? h("div", { class: "tt one" }, ...rows.map((r) => slot(r, "teacher"))) : null);
+};
+M.pHome = async (box) => {
+  const [att, inv, rem] = await Promise.all([get("attendance", mine()), get("invoices", mine()), get("remarks", mine())]);
+  const pct = (id) => { const r = att.filter((x) => x.studentId === id && x.status !== "Excused"); return r.length ? Math.round(100 * r.filter((x) => x.status !== "Absent").length / r.length) + "%" : "–"; };
+  put(box, h("div", { class: "card hello" }, h("h2", {}, `Hello, ${me.name.split(" ")[0]}! 👋`), h("p", {}, kids.length ? "Here is how your child" + (kids.length > 1 ? "ren are" : " is") + " doing." : "No child is linked to your account yet. Please contact the school office.")),
+    h("div", { class: "cards" }, ...kids.map((k) => { const owed = inv.filter((i) => i.studentId === k.id).reduce((a, i) => a + i.amount - i.paid, 0), last = rem.filter((r) => r.studentId === k.id).sort((x, y) => (y.date || "").localeCompare(x.date || ""))[0];
+      return h("article", { class: "card" }, h("h3", {}, nm(k)), h("p", { class: "muted" }, [k.className, k.admissionNo && "Adm. " + k.admissionNo].filter(Boolean).join(" · ")),
+        h("p", {}, h("b", {}, pct(k.id)), " attendance"), h("p", {}, owed ? `PKR ${owed.toLocaleString()} fees due` : "Fees up to date ✅"),
+        last ? h("p", { class: "muted" }, "“" + last.text + "” — " + (last.teacherName || "teacher")) : null); })));
+};
 M.news = async (box) => {
   const mineAud = { admin: "Admins", teacher: "Teachers", parent: "Parents", student: "Students" }[me.role];
   const a = (await get("announcements", F.orderBy("createdAt", "desc"))).filter((x) => x.audience === "Everyone" || x.audience === mineAud);
@@ -205,14 +229,14 @@ M.myRes = async (box) => {
   const c = classesOfKids(); if (!c.length) return noClass(box);
   const rows = await get("resources", F.where("className", "in", c)), subs = [...new Set(rows.map((r) => r.subject).filter(Boolean))].sort(), out = h("div");
   const draw = (v) => out.replaceChildren(rows.length ? resCards(rows.filter((r) => !v || r.subject === v)) : h("p", { class: "notice" }, "Nothing has been shared yet."));
-  box.append(subs.length ? h("div", { class: "card form" }, h("label", {}, "Subject", h("select", { onchange: (e) => draw(e.target.value) }, h("option", { value: "" }, "All subjects"), ...subs.map((x) => h("option", {}, x))))) : null, out); draw("");
+  put(box, subs.length ? h("div", { class: "card form" }, h("label", {}, "Subject", h("select", { onchange: (e) => draw(e.target.value) }, h("option", { value: "" }, "All subjects"), ...subs.map((x) => h("option", {}, x))))) : null, out); draw("");
 };
 M.myAsg = forClass("assignments", [["title", "Title"], ["subject", "Subject"], ["className", "Class"], ["dueDate", "Due"], ["description", "Instructions"], ["pdfUrl", "PDF", "link"]]);
 
 const NAV = {
   admin: [["dash", "Dashboard"], ["students", "Students"], ["teachers", "Teachers"], ["parents", "Parents"], ["classes", "Classes"], ["subjects", "Subjects"], ["timetable", "Timetable"], ["planners", "Planners"], ["attendance", "Attendance"], ["fees", "Fees"], ["assignments", "Assignments"], ["resources", "Classwork & Recordings"], ["remarks", "Remarks"], ["announce", "Announcements"]],
-  teacher: [["tTT", "My timetable"], ["attendance", "Attendance"], ["assignments", "Assignments"], ["resources", "Classwork & Recordings"], ["planners", "Planners"], ["remarks", "Remarks"], ["news", "Announcements"]],
-  parent: [["news", "Announcements"], ["myTT", "Timetable"], ["myAtt", "Attendance"], ["myFees", "Fees"], ["myRem", "Teacher remarks"], ["myRes", "Classwork & Recordings"], ["myAsg", "Assignments"]],
+  teacher: [["tHome", "Home"], ["tTT", "My timetable"], ["attendance", "Attendance"], ["assignments", "Assignments"], ["resources", "Classwork & Recordings"], ["planners", "Planners"], ["remarks", "Remarks"], ["news", "Announcements"]],
+  parent: [["pHome", "Home"], ["news", "Announcements"], ["myTT", "Timetable"], ["myAtt", "Attendance"], ["myFees", "Fees"], ["myRem", "Teacher remarks"], ["myRes", "Classwork & Recordings"], ["myAsg", "Assignments"]],
   student: [["home", "Home"], ["myTT", "Timetable"], ["myRes", "Classwork & Recordings"], ["myAsg", "Assignments"], ["myAtt", "My attendance"], ["myRem", "Teacher remarks"], ["news", "Announcements"]],
 };
 async function show() {
@@ -226,9 +250,10 @@ F.onAuthStateChanged(auth, async (u) => {
   const role = (await u.getIdTokenResult(true)).claims.role;
   if (!NAV[role]) { $("#boot").textContent = "Your account has no role yet. Please contact the school office."; return; }
   me = { uid: u.uid, role, email: u.email, name: u.displayName || u.email };
-  document.body.className = role === "admin" ? "theme-admin" : "kid" + (role === "student" ? " fun" : "");
+  document.body.className = role === "admin" ? "theme-admin" : "kid role-" + role + (role === "student" ? " fun" : "");
   if (role === "parent") kids = await get("students", F.where("parentIds", "array-contains", u.uid));
   if (role === "student") { const s = await F.getDoc(F.doc(db, "students", u.uid)); kids = s.exists() ? [{ id: s.id, ...s.data() }] : []; }
+  if (role === "teacher") { const t = await F.getDoc(F.doc(db, "teachers", u.uid)); me.title = t.exists() ? t.data().title || "" : ""; }
   $("#who").textContent = role[0].toUpperCase() + role.slice(1); $("#em").textContent = u.email;
   $("#nav").replaceChildren(...NAV[role].map(([k, l]) => h("a", { href: "#" + k, "data-k": k }, l)));
   $("#out").onclick = () => F.signOut(auth);
