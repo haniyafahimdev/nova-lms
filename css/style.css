@@ -77,3 +77,9 @@ footer{background:var(--side);color:#fff;padding:30px 5vw}
 
 .wa{position:fixed;right:16px;bottom:16px;background:#1faa59;color:#fff;border-radius:30px;padding:12px 18px;font-weight:800;text-decoration:none;z-index:40;box-shadow:0 4px 14px #0004;transition:transform .2s}.wa:hover{transform:scale(1.06)}
 footer a{text-decoration:none}
+
+/* different colours per role: student = sunny yellow (default), teacher = violet, parent = teal */
+.role-teacher{--brand:#7c5cff;--brand-ink:#fff;--tint:#efeaff;--side:#2a2250;--acc:#ff7a59;--bg:#f7f5ff;--line:#e3dcf7}
+.role-parent{--brand:#14a38b;--brand-ink:#fff;--tint:#e4f7f2;--side:#0f3d38;--acc:#ff7a59;--bg:#f4fbf9;--line:#d5eee8}
+.role-teacher .hello:after{content:"🍎"}.role-parent .hello:after{content:"🌸"}
+.dark.dark{--ink:#eef1ff;--bg:#0d1020;--card:#151a33;--line:#262c52;--tint:#0d1020;--side:#0a0d1c;--muted:#a0a8d4}
