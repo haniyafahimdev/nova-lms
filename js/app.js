@@ -29,6 +29,25 @@ const resCards = (rows) => h("div", { class: "cards" }, ...rows.map((r) => { con
        : h("div", { class: "thumb ph" }, r.type === "Homework PDF" ? "📄" : "📎"),
     h("h3", {}, r.title), h("p", { class: "muted" }, [r.type, r.subject, r.className].filter(Boolean).join(" · ")),
     !id && ok(r.url) && h("a", { class: "btn sm", href: r.url, target: "_blank", rel: "noopener" }, "Open")); }));
+const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"], todayAbbr = () => new Date().toLocaleDateString("en-US", { weekday: "short" });
+const hue = (t) => [...String(t)].reduce((a, c) => a + c.charCodeAt(0), 0) * 37 % 360;
+const slot = (r, who) => h("div", { class: "slot", style: `border-left-color:hsl(${hue(r.subject)},70%,55%)` }, h("b", {}, r.subject || "Class"), h("small", {}, `Period ${r.period} · ${r.start || ""}–${r.end || ""}`), h("small", {}, who === "teacher" ? r.className : r.teacher || ""));
+const ttGrid = (rows, who) => { const days = DAYS.filter((d) => d !== "Sat" || rows.some((r) => r.day === "Sat"));
+  return rows.length ? h("div", { class: "tt" }, ...days.map((d) => h("div", { class: "ttday" + (d === todayAbbr() ? " now" : "") }, h("h3", {}, d + (d === todayAbbr() ? " · today" : "")),
+    ...(rows.filter((r) => r.day === d).sort((a, b) => a.period - b.period).map((r) => slot(r, who)).concat(rows.some((r) => r.day === d) ? [] : [h("small", { class: "muted" }, "No classes")]))))) : h("p", { class: "notice" }, "No timetable has been added yet."); };
+async function ticker() {
+  const aud = { teacher: "Teachers", parent: "Parents", student: "Students" }[me.role];
+  const a = (await get("announcements", F.orderBy("createdAt", "desc"), F.limit(8))).filter((x) => x.audience === "Everyone" || x.audience === aud); if (!a.length) return;
+  const items = a.map((x) => h("a", { href: "#news" }, "📣 " + x.title + (x.message ? ": " + x.message.slice(0, 60) : "")));
+  $(".main").insertBefore(h("div", { class: "ticker", "aria-label": "Latest announcements" }, h("div", { class: "track" }, ...items, ...items.map((i) => i.cloneNode(true)))), $("#main"));
+}
+function funMode() {                                   // star cursor + sparkle burst on click (skipped for reduced-motion users)
+  if (matchMedia("(prefers-reduced-motion:reduce)").matches) return;
+  const cur = h("div", { class: "cursor" }, "⭐"); document.body.append(cur);
+  addEventListener("pointermove", (e) => { cur.style.transform = `translate(${e.clientX}px,${e.clientY}px)`; });
+  addEventListener("pointerdown", (e) => { for (let i = 0; i < 8; i++) { const sp = h("span", { class: "spark" }, ["⭐", "✨", "🎈", "💛"][i % 4]);
+    sp.style.left = e.clientX + "px"; sp.style.top = e.clientY + "px"; sp.style.setProperty("--dx", Math.random() * 160 - 80 + "px"); sp.style.setProperty("--dy", -(Math.random() * 140 + 20) + "px"); document.body.append(sp); setTimeout(() => sp.remove(), 900); } });
+}
 const csOpts = async () => { const [c, s] = await Promise.all([classNames(), get("subjects")]);
   return c.flatMap((cn) => [{ v: cn + "||", l: cn + " · all subjects" }, ...s.filter((x) => x.className === cn).map((x) => ({ v: cn + "||" + x.name, l: cn + " · " + x.name }))]); };
 const splitCs = ({ cs, ...r }) => { const [className, subject] = cs.split("||"); return { ...r, className, subject }; };
@@ -80,6 +99,16 @@ M.assignments = crud("assignments", async () => [{ n: "title", l: "Title", r: 1 
 M.resources = crud("resources", async () => [{ n: "title", l: "Title", r: 1 }, { n: "type", l: "Type", t: "select", o: ["Recording", "Classwork", "Homework PDF"], r: 1 }, { n: "cs", l: "Class · Subject", t: "select", o: await csOpts(), r: 1 }, { n: "url", l: "Link (unlisted YouTube video, Drive PDF…)", t: "url", r: 1 }], [["title", "Title"], ["type", "Type"], ["className", "Class"], ["subject", "Subject"], ["url", "Video / file", "link"]], splitCs);
 M.announce = crud("announcements", async () => [{ n: "title", l: "Title", r: 1 }, { n: "audience", l: "Audience", t: "select", o: ["Everyone", "Parents", "Teachers", "Students"] }, { n: "message", l: "Message", t: "area", r: 1 }], [["title", "Title"], ["audience", "Audience"], ["message", "Message"]]);
 
+M.timetable = crud("timetable", async () => [{ n: "cs", l: "Class · Subject", t: "select", o: await csOpts(), r: 1 }, { n: "day", l: "Day", t: "select", o: DAYS }, { n: "period", l: "Period no.", t: "number", r: 1 }, { n: "start", l: "Start", t: "time", r: 1 }, { n: "end", l: "End", t: "time", r: 1 }, { n: "teacher", l: "Teacher", t: "select", o: ["", ...(await get("teachers")).map(nm)] }],
+  [["day", "Day"], ["period", "Period"], ["start", "Start"], ["end", "End"], ["className", "Class"], ["subject", "Subject"], ["teacher", "Teacher"]], (d) => ({ ...splitCs(d), period: +d.period }));
+M.planners = crud("planners", async () => [{ n: "week", l: "Week starting", t: "date", r: 1 }, { n: "cs", l: "Class · Subject", t: "select", o: await csOpts(), r: 1 }, { n: "topics", l: "Topics / plan for the week", t: "area", r: 1 }, { n: "link", l: "Planner file link (Drive etc.)", t: "url" }],
+  [["week", "Week of"], ["className", "Class"], ["subject", "Subject"], ["topics", "Plan"], ["teacher", "Teacher"], ["link", "File", "link"]], (d) => ({ ...splitCs(d), teacher: me.name }));
+M.myTT = async (box) => { const c = classesOfKids(); if (!c.length) return noClass(box); box.append(ttGrid(await get("timetable", F.where("className", "in", c)), "student")); };
+M.tTT = async (box) => box.append(ttGrid(await get("timetable", F.where("teacher", "==", me.name)), "teacher"));
+M.home = async (box) => {
+  const c = classesOfKids(), rows = c.length ? (await get("timetable", F.where("className", "in", c))).filter((r) => r.day === todayAbbr()).sort((a, b) => a.period - b.period) : [];
+  box.append(h("div", { class: "card hello" }, h("h2", {}, `Hi ${me.name.split(" ")[0]}! 👋`), h("p", {}, rows.length ? "Here are your classes today:" : "No classes today. Enjoy your day! 🎉")), rows.length ? h("div", { class: "tt one" }, ...rows.map((r) => slot(r, "student"))) : null);
+};
 M.dash = async (box) => {
   const t = today(), day = (n) => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10), cnt = (c) => F.getCountFromServer(F.collection(db, c)).then((x) => x.data().count);
   const [ns, nt, att, inv, asg, news, rem, cls] = await Promise.all([cnt("students"), cnt("teachers"), get("attendance", F.where("date", ">=", day(-30))), get("invoices"), get("assignments"),
@@ -181,10 +210,10 @@ M.myRes = async (box) => {
 M.myAsg = forClass("assignments", [["title", "Title"], ["subject", "Subject"], ["className", "Class"], ["dueDate", "Due"], ["description", "Instructions"], ["pdfUrl", "PDF", "link"]]);
 
 const NAV = {
-  admin: [["dash", "Dashboard"], ["students", "Students"], ["teachers", "Teachers"], ["parents", "Parents"], ["classes", "Classes"], ["subjects", "Subjects"], ["attendance", "Attendance"], ["fees", "Fees"], ["assignments", "Assignments"], ["resources", "Classwork & Recordings"], ["remarks", "Remarks"], ["announce", "Announcements"]],
-  teacher: [["news", "Announcements"], ["attendance", "Attendance"], ["assignments", "Assignments"], ["resources", "Classwork & Recordings"], ["remarks", "Remarks"]],
-  parent: [["news", "Announcements"], ["myAtt", "Attendance"], ["myFees", "Fees"], ["myRem", "Teacher remarks"], ["myRes", "Classwork & Recordings"], ["myAsg", "Assignments"]],
-  student: [["news", "Announcements"], ["myRes", "Classwork & Recordings"], ["myAsg", "Assignments"], ["myAtt", "My attendance"], ["myRem", "Teacher remarks"]],
+  admin: [["dash", "Dashboard"], ["students", "Students"], ["teachers", "Teachers"], ["parents", "Parents"], ["classes", "Classes"], ["subjects", "Subjects"], ["timetable", "Timetable"], ["planners", "Planners"], ["attendance", "Attendance"], ["fees", "Fees"], ["assignments", "Assignments"], ["resources", "Classwork & Recordings"], ["remarks", "Remarks"], ["announce", "Announcements"]],
+  teacher: [["tTT", "My timetable"], ["attendance", "Attendance"], ["assignments", "Assignments"], ["resources", "Classwork & Recordings"], ["planners", "Planners"], ["remarks", "Remarks"], ["news", "Announcements"]],
+  parent: [["news", "Announcements"], ["myTT", "Timetable"], ["myAtt", "Attendance"], ["myFees", "Fees"], ["myRem", "Teacher remarks"], ["myRes", "Classwork & Recordings"], ["myAsg", "Assignments"]],
+  student: [["home", "Home"], ["myTT", "Timetable"], ["myRes", "Classwork & Recordings"], ["myAsg", "Assignments"], ["myAtt", "My attendance"], ["myRem", "Teacher remarks"], ["news", "Announcements"]],
 };
 async function show() {
   const items = NAV[me.role], k = location.hash.slice(1), it = items.find((x) => x[0] === k) || items[0], box = $("#main");
@@ -197,14 +226,20 @@ F.onAuthStateChanged(auth, async (u) => {
   const role = (await u.getIdTokenResult(true)).claims.role;
   if (!NAV[role]) { $("#boot").textContent = "Your account has no role yet. Please contact the school office."; return; }
   me = { uid: u.uid, role, email: u.email, name: u.displayName || u.email };
-  document.body.className = role === "admin" ? "theme-admin" : "";
+  document.body.className = role === "admin" ? "theme-admin" : "kid" + (role === "student" ? " fun" : "");
   if (role === "parent") kids = await get("students", F.where("parentIds", "array-contains", u.uid));
   if (role === "student") { const s = await F.getDoc(F.doc(db, "students", u.uid)); kids = s.exists() ? [{ id: s.id, ...s.data() }] : []; }
   $("#who").textContent = role[0].toUpperCase() + role.slice(1); $("#em").textContent = u.email;
   $("#nav").replaceChildren(...NAV[role].map(([k, l]) => h("a", { href: "#" + k, "data-k": k }, l)));
   $("#out").onclick = () => F.signOut(auth);
   $("#pw").onclick = async () => { await F.sendPasswordResetEmail(auth, u.email); toast("Password reset link sent to your email"); };
+  if (role !== "admin") {
+    const side = $(".side"), scrim = h("div", { class: "scrim" }), close = () => { side.classList.remove("open"); scrim.classList.remove("on"); };
+    scrim.onclick = close; document.body.append(scrim); addEventListener("hashchange", close);
+    $(".bar").prepend(h("button", { class: "btn sm", "aria-label": "Open menu", onclick: () => { side.classList.add("open"); scrim.classList.add("on"); } }, "☰ Menu"), h("b", { class: "brand" }, "NOVA"));
+    ticker().catch(() => {}); if (role === "student") funMode();
+  }
   const dk = h("button", { class: "btn sm ghost", "aria-label": "Toggle dark mode", onclick: () => { const on = document.body.classList.toggle("dark"); try { localStorage.setItem("nova_dark", on ? "1" : ""); } catch {} } }, "🌓");
-  $(".bar").prepend(dk); try { if (localStorage.getItem("nova_dark")) document.body.classList.add("dark"); } catch {}
+  $("#pw").before(dk); try { if (localStorage.getItem("nova_dark")) document.body.classList.add("dark"); } catch {}
   $("#boot").hidden = true; $(".shell").hidden = false; addEventListener("hashchange", show); show();
 });
