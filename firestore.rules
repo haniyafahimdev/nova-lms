@@ -21,6 +21,7 @@ service cloud.firestore {
     match /invoices/{id}   { allow read: if mineRec(); }
 
     match /classes/{id}     { allow read: if signedIn(); }
+    match /subjects/{id}    { allow read: if signedIn(); }
     match /assignments/{id} { allow read: if signedIn(); allow write: if isTeacher(); }
     match /resources/{id}   { allow read: if signedIn(); allow write: if isTeacher(); }
     match /announcements/{id} { allow read: if signedIn(); }
