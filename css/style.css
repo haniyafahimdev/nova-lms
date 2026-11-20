@@ -54,3 +54,23 @@ footer{background:var(--side);color:#fff;padding:30px 5vw}
 .thumb img{width:100%;height:100%;object-fit:cover}.thumb.ph{display:grid;place-items:center;font-size:2.4rem}.play{position:absolute;inset:0;display:grid;place-items:center;color:#fff;font-size:2.4rem;text-shadow:0 2px 12px #000}.res h3{font-size:1.05rem}
 .dark{--ink:#eef1ff;--bg:#0d1020;--card:#151a33;--line:#262c52;--tint:#0d1020;--side:#0a0d1c;--muted:#a0a8d4}
 .dark input,.dark select,.dark textarea{background:#0f1329;color:#eef1ff}.dark .btn.ghost{color:#eef1ff}
+
+/* teacher / parent / student layout: top bar + slide-in menu */
+.kid .shell{flex-direction:column}.kid .side{position:fixed;top:0;left:0;bottom:0;width:270px;z-index:55;transform:translateX(-105%);transition:transform .3s;box-shadow:6px 0 30px #0006}.kid .side.open{transform:none}
+.kid .side nav{display:grid;overflow:visible}.kid .main{width:100%;max-width:1100px;margin:0 auto}
+.kid .bar{position:sticky;top:8px;z-index:20;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:8px 12px;box-shadow:0 4px 14px #0001}.kid .brand{font:800 1.4rem "Baloo 2";margin-right:auto}
+.scrim{position:fixed;inset:0;background:#0007;z-index:50;display:none}.scrim.on{display:block}
+.ticker{overflow:hidden;white-space:nowrap;background:var(--brand);color:var(--brand-ink);border-radius:14px;margin-bottom:14px;font-weight:700}
+.track{display:inline-flex;padding:9px 0;animation:marq 40s linear infinite}.track a{padding-right:56px;text-decoration:none;color:inherit}.ticker:hover .track{animation-play-state:paused}@keyframes marq{to{transform:translateX(-50%)}}
+/* timetable */
+.tt{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}.tt.one{margin-bottom:14px}
+.ttday{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:12px;display:grid;gap:8px;align-content:start}.ttday.now{border:2px solid var(--brand);background:var(--tint)}.ttday h3{margin:0;font-size:1.05rem}
+.slot{background:var(--bg);border-left:6px solid var(--brand);border-radius:10px;padding:8px 10px;display:grid}.slot small{color:var(--muted)}
+/* student fun mode */
+.hello{position:relative;overflow:hidden;background:linear-gradient(120deg,var(--card),var(--tint))}.hello h2{font-size:2rem}.hello:after{content:"🎈";position:absolute;right:20px;top:10px;font-size:3.4rem;animation:float 4s ease-in-out infinite}
+.fun .card{transition:transform .2s}.fun .card:hover{transform:translateY(-4px) rotate(-.6deg)}.fun .btn:hover{animation:wiggle .4s}.fun .slot{transition:transform .2s}.fun .slot:hover{transform:scale(1.05) rotate(1deg)}
+.cursor{position:fixed;left:-14px;top:-14px;font-size:28px;pointer-events:none;z-index:99;will-change:transform;filter:drop-shadow(0 2px 3px #0004)}
+.spark{position:fixed;pointer-events:none;z-index:99;font-size:22px;animation:burst .9s ease-out forwards}@keyframes burst{to{transform:translate(var(--dx),var(--dy)) scale(.4) rotate(120deg);opacity:0}}
+@media (pointer:fine){.fun,.fun *{cursor:none!important}}@media (pointer:coarse){.cursor{display:none}}
+@media(max-width:600px){#em{display:none}}
+@media(prefers-reduced-motion:reduce){.ticker{overflow-x:auto}.fun,.fun *{cursor:auto!important}.cursor{display:none}}
