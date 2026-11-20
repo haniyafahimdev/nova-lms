@@ -21,12 +21,12 @@ const ytId = (u) => { try { const x = new URL(u); const id = x.hostname === "you
 const play = (url, title) => {                       // plays YouTube inside the page, no new tab
   const m = h("div", { class: "modal", onclick: (e) => { if (e.target === m) m.remove(); } }, h("div", { class: "mbox" },
     h("button", { class: "btn sm ghost", onclick: () => m.remove() }, "✕ Close"),
-    h("div", { class: "vid" }, h("iframe", { src: `https://www.youtube-nocookie.com/embed/${ytId(url)}?autoplay=1&rel=0`, allow: "autoplay; encrypted-media; fullscreen", allowfullscreen: true, title: title || "Video" }))));
+    h("div", { class: "vid" }, h("iframe", { src: `https://www.youtube-nocookie.com/embed/${ytId(url)}?autoplay=1&rel=0`, allow: "autoplay; encrypted-media; fullscreen", allowfullscreen: true, title: title || "Video" })), h("p", { style: "margin:8px 4px 0" }, h("a", { href: "https://www.youtube.com/watch?v=" + ytId(url), target: "_blank", rel: "noopener", style: "color:#fff" }, "Video not playing? Open it on YouTube"))));
   document.body.append(m);
 };
 const resCards = (rows) => h("div", { class: "cards" }, ...rows.map((r) => { const id = ytId(r.url);
   return h("article", { class: "card res" },
-    id ? h("button", { class: "thumb", "aria-label": "Play " + r.title, onclick: () => play(r.url, r.title) }, h("img", { src: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`, alt: "" }), h("span", { class: "play" }, "▶"))
+    id ? h("button", { class: "thumb", "aria-label": "Play " + r.title, onclick: () => play(r.url, r.title) }, h("img", { src: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`, alt: "", onerror: (e) => e.target.replaceWith(h("div", { class: "thumb ph" }, "🎬")) }), h("span", { class: "play" }, "▶"))
        : h("div", { class: "thumb ph" }, r.type === "Homework PDF" ? "📄" : "📎"),
     h("h3", {}, r.title), h("p", { class: "muted" }, [r.type, r.subject, r.className].filter(Boolean).join(" · ")),
     !id && ok(r.url) && h("a", { class: "btn sm", href: r.url, target: "_blank", rel: "noopener" }, "Open")); }));
@@ -151,7 +151,7 @@ M.dash = async (box) => {
       h("div", { class: "card" }, h("b", {}, "Attendance pulse"), h("div", { class: "muted" }, "Whole school · last 5 recorded days"), days.length ? h("div", { class: "bars" }, ...days.map((d) => col(d.v, d.l))) : h("p", { class: "notice" }, "No attendance recorded yet.")),
       h("div", { class: "card" }, h("b", {}, "Needs attention"), ...(att2.length ? att2.map(([, c, t1, sub, href]) => h("a", { class: "li", href }, h("span", { class: "dot", style: "background:" + c }), h("div", {}, h("b", {}, t1), h("div", { class: "muted" }, sub || "")))) : [h("p", { class: "notice" }, "All clear. Nothing needs attention.")]))),
     h("div", { class: "two" },
-      h("div", { class: "card" }, h("b", {}, "Fees by month"), h("div", { class: "muted" }, "Billed (grey) vs collected (colour)"), months.length ? h("div", { class: "bars" }, ...months.map((m) => h("div", { class: "bcol" }, h("div", { class: "pair" }, h("div", { class: "bfill billed", style: `height:${120 * bm[m] / mx}px` }), h("div", { class: "bfill", style: `height:${120 * cm[m] / mx}px` })), h("small", { class: "muted" }, new Date(m + "-01").toLocaleDateString("en-GB", { month: "short" }))))) : h("p", { class: "notice" }, "No invoices yet.")),
+      h("div", { class: "card" }, h("b", {}, "Fees by month"), h("div", { class: "muted" }, h("span", { class: "key billed" }), " Billed   ", h("span", { class: "key" }), " Collected"), months.length ? h("div", { class: "bars" }, ...months.map((m) => h("div", { class: "bcol" }, h("div", { class: "pair" }, h("div", { class: "bfill billed", style: `height:${120 * bm[m] / mx}px` }), h("div", { class: "bfill", style: `height:${120 * cm[m] / mx}px` })), h("small", { class: "muted" }, new Date(m + "-01").toLocaleDateString("en-GB", { month: "short" }))))) : h("p", { class: "notice" }, "No invoices yet.")),
       h("div", { class: "card" }, h("b", {}, "Recent activity"), ...(act.length ? act.map((x) => h("div", { class: "li" }, h("span", { class: "dot", style: "background:var(--brand)" }), h("div", {}, h("b", {}, x.t), h("div", { class: "muted" }, ago(x.ms))))) : [h("p", { class: "notice" }, "Nothing yet.")]))));
 };
 M.attendance = async (box) => {
