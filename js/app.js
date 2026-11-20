@@ -21,7 +21,7 @@ const ytId = (u) => { try { const x = new URL(u); const id = x.hostname === "you
 const play = (url, title) => {                       // plays YouTube inside the page, no new tab
   const m = h("div", { class: "modal", onclick: (e) => { if (e.target === m) m.remove(); } }, h("div", { class: "mbox" },
     h("button", { class: "btn sm ghost", onclick: () => m.remove() }, "✕ Close"),
-    h("div", { class: "vid" }, h("iframe", { src: `https://www.youtube-nocookie.com/embed/${ytId(url)}?autoplay=1&rel=0`, allow: "autoplay; encrypted-media; fullscreen", allowfullscreen: true, title: title || "Video" })), h("p", { style: "margin:8px 4px 0" }, h("a", { href: "https://www.youtube.com/watch?v=" + ytId(url), target: "_blank", rel: "noopener", style: "color:#fff" }, "Video not playing? Open it on YouTube"))));
+    h("div", { class: "vid" }, h("iframe", { src: `https://www.youtube-nocookie.com/embed/${ytId(url)}?autoplay=1&rel=0`, allow: "autoplay; encrypted-media; fullscreen", title: title || "Video" })), h("p", { style: "margin:8px 4px 0" }, h("a", { href: "https://www.youtube.com/watch?v=" + ytId(url), target: "_blank", rel: "noopener", style: "color:#fff" }, "Video not playing? Open it on YouTube"))));
   document.body.append(m);
 };
 const resCards = (rows) => h("div", { class: "cards" }, ...rows.map((r) => { const id = ytId(r.url);
